@@ -1,0 +1,11 @@
+{{.}} () {
+    # Create a temporary file to hold the results of our search.
+    # This is used for IPC between our search and execution commands for a few reasons:
+    # 1. If we exec the command inside the go app we can't execute any of the bash built-ins
+    # we can only execute external commands. For example "cd /tmp" will fail.
+    # 2. We can't set bash variables because they would be set in a sub shell.
+    # This allows the command to be executed within the current shell.
+    tfile="$(mktemp /tmp/foo.XXXXXXXXX)" || exit 1
+    history-searcher search --output-file ${tfile}
+    source ${tfile}
+}

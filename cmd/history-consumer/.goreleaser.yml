@@ -1,0 +1,73 @@
+# subroj1/.goreleaser.yml
+project_name: history-consumer
+
+monorepo:
+  tag_prefix: history-consumer/
+  dir: .
+
+# This is an example .goreleaser.yml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+release:
+  # Default is extracted from the origin remote URL or empty if its private hosted.
+  # You can also use Gitlab's internal project id by setting it in the name
+  #  field and leaving the owner field empty.
+  name_template: "history-consumer-v{{.Version}}"
+dockers:
+  - image_templates:
+      - "ghcr.io/mgale/history-consumer:{{ .Tag }}"
+      # Template of the docker build flags.
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    - go generate ./...
+after:
+  # Templates for the commands to be ran.
+  # This is a helper step to ensure that the image is available locally as <image-name>:latest for testing.
+  hooks:
+    - docker tag ghcr.io/mgale/history-consumer:{{ .Tag }} history-consumer:latest
+builds:
+  # Binary name.
+  # Can be a path (e.g. `bin/app`) to wrap the binary in a directory.
+  # Default is the name of the project directory.
+  - binary: history-consumer
+    # Custom flags templates.
+    # Default is empty.
+    flags:
+      - -mod=mod
+      - -a
+    # Custom build tags templates.
+    # Default is empty.
+    tags:
+      - netgo
+      - osusergo
+      - static_build
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    # GOARCH to build for.
+    # For more info refer to: https://golang.org/doc/install/source#environment
+    # Defaults are 386, amd64 and arm64.
+    goarch:
+      - amd64
+archives:
+  - replacements:
+      linux: Linux
+      amd64: x86_64
+checksum:
+  name_template: "checksums.txt"
+snapshot:
+  name_template: "{{ incpatch .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"

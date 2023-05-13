@@ -1,0 +1,77 @@
+version: '3'
+services:
+  # Capture the history of the user's shell and export it to NATS
+  history-exporter:
+    image: ghcr.io/mgale/history-exporter:v0.0.0
+    environment:
+      - NATSIO_URL=nats://nats-server:4222
+    command: "load-bash-history --file /data/bash_history"
+    volumes:
+      - ~/.bash_history:/data/bash_history
+  # Consume the history from NATS and store it in a sqlite database
+  history-consumer:
+    image: ghcr.io/mgale/history-consumer:v0.0.0
+    environment:
+      - DB_FILENAME=/data/history_database.db
+      - NATSIO_URL=nats://nats-server:4222
+    volumes:
+      - db-volume:/data
+    restart: always
+  # Sync the history from the sqlite database to typesense
+  document-syncer:
+    image: ghcr.io/mgale/document-syncer:v0.0.0
+    environment:
+      - TYPESENSE_URL=http://typesense:8108
+      - TYPESENSE_API_KEY=typesense123
+      - NATSIO_URL=nats://nats-server:4222
+    restart: always
+  # nats-server is the NATS server that is used to communicate
+  # between the history-consumer and the document-syncer.
+  nats-server:
+    image: nats:latest
+    deploy:
+      resources:
+        limits:
+          memory: 500M
+        reservations:
+          memory: 20M
+    ports:
+      - "4222:4222"
+      - "6222:6222"
+      - "8222:8222"
+    environment:
+      - CLUSTER_NAME=bashhistory
+      - ROUTES_PASSWORD=routes123
+      - ADMIN_PASSWORD=admin123
+    restart: always
+  # sqlite-web provides a web interface to the sqlite database
+  # for testing and debugging purposes.
+  sqlite-web:
+    image: coleifer/sqlite-web
+    ports:
+      - "8080:8080"
+    environment:
+      - SQLITE_DATABASE=history_database.db
+    volumes:
+      - db-volume:/data
+  typesense:
+    image: typesense/typesense:0.23.1
+    ports:
+      - "8108:8108"
+    environment:
+      - TYPESENSE_API_KEY=typesense123
+      - TYPESENSE_DATA_DIR=/data
+    command: "--enable-cors --cors-allow-origin=*"
+    volumes:
+      - typesense-volume:/data
+    restart: always
+  # typesense-dashboard provides a web interface to typesense
+  # for testing and debugging purposes.
+  typesense-dashboard:
+    image: funxtionatics/typesense-dashboard:latest
+    ports:
+      - "8000:80"
+
+volumes:
+  typesense-volume:
+  db-volume:
